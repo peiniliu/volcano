@@ -500,9 +500,11 @@ func (ni *NodeInfo) getDevicesAllGPUMemory() map[int]uint {
 func (ni *NodeInfo) AddGPUResource(pod *v1.Pod) {
 	gpuRes := GetGPUResourceOfPod(pod)
 	if gpuRes > 0 {
-		id := GetGPUIndex(pod)
-		if dev := ni.GPUDevices[id]; dev != nil {
-			dev.PodMap[string(pod.UID)] = pod
+		ids := GetGPUIndex(pod)
+		for _, id := range ids {
+		   if dev := ni.GPUDevices[id]; dev != nil {
+		   	  dev.PodMap[string(pod.UID)] = pod
+		   }
 		}
 	}
 }
@@ -511,9 +513,11 @@ func (ni *NodeInfo) AddGPUResource(pod *v1.Pod) {
 func (ni *NodeInfo) SubGPUResource(pod *v1.Pod) {
 	gpuRes := GetGPUResourceOfPod(pod)
 	if gpuRes > 0 {
-		id := GetGPUIndex(pod)
-		if dev := ni.GPUDevices[id]; dev != nil {
-			delete(dev.PodMap, string(pod.UID))
+		ids := GetGPUIndex(pod)
+		for _, id := range ids {
+		   if dev := ni.GPUDevices[id]; dev != nil {
+		   	  delete(dev.PodMap, string(pod.UID))
+		   }
 		}
 	}
 }

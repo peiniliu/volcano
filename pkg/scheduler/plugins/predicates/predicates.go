@@ -172,30 +172,31 @@ func (pp *predicatesPlugin) OnSessionOpen(ssn *framework.Session) {
 				return
 			}
 
-			if predicate.gpuSharingEnable && api.GetGPUResourceOfPod(pod) > 0 {
+			if predicate.gpuSharingEnable && (api.GetGPUResourceOfPod(pod) > 0 || api.GetGPUNumberOfPod(pod) > 0) {
 				nodeInfo, ok := ssn.Nodes[nodeName]
 				if !ok {
 					klog.Errorf("Failed to get node %s info from cache", nodeName)
 					return
 				}
-
-				id := predicateGPU(pod, nodeInfo)
-				if id < 0 {
+				ids := predicateGPU(pod, nodeInfo)
+				if ids == nil {
 					klog.Errorf("The node %s can't place the pod %s in ns %s", pod.Spec.NodeName, pod.Name, pod.Namespace)
 					return
 				}
-				patch := api.AddGPUIndexPatch(id)
+				patch := api.AddGPUIndexPatch(ids)
 				pod, err := kubeClient.CoreV1().Pods(pod.Namespace).Patch(context.TODO(), pod.Name, types.JSONPatchType, []byte(patch), metav1.PatchOptions{})
 				if err != nil {
 					klog.Errorf("Patch pod %s failed with patch %s: %v", pod.Name, patch, err)
 					return
 				}
-				dev, ok := nodeInfo.GPUDevices[id]
-				if !ok {
+				for _, id := range ids {
+				    dev, ok := nodeInfo.GPUDevices[id]
+				    if !ok {
 					klog.Errorf("Failed to get GPU %d from node %s", id, nodeName)
 					return
+				    } 
+				    dev.PodMap[string(pod.UID)] = pod
 				}
-				dev.PodMap[string(pod.UID)] = pod
 				klog.V(4).Infof("predicates with gpu sharing, update pod %s/%s allocate to node [%s]", pod.Namespace, pod.Name, nodeName)
 			}
 
@@ -211,9 +212,9 @@ func (pp *predicatesPlugin) OnSessionOpen(ssn *framework.Session) {
 				return
 			}
 
-			if predicate.gpuSharingEnable && api.GetGPUResourceOfPod(pod) > 0 {
+			if predicate.gpuSharingEnable && (api.GetGPUResourceOfPod(pod) > 0 || api.GetGPUNumberOfPod(pod) > 0) {
 				// deallocate pod gpu id
-				id := api.GetGPUIndex(pod)
+				ids := api.GetGPUIndex(pod)
 				patch := api.RemoveGPUIndexPatch()
 				_, err := kubeClient.CoreV1().Pods(pod.Namespace).Patch(context.TODO(), pod.Name, types.JSONPatchType, []byte(patch), metav1.PatchOptions{})
 				if err != nil {
@@ -226,8 +227,10 @@ func (pp *predicatesPlugin) OnSessionOpen(ssn *framework.Session) {
 					klog.Errorf("Failed to get node %s info from cache", nodeName)
 					return
 				}
-				if dev, ok := nodeInfo.GPUDevices[id]; ok {
-					delete(dev.PodMap, string(pod.UID))
+				for _, id := range ids {
+				    if dev, ok := nodeInfo.GPUDevices[id]; ok {
+					   delete(dev.PodMap, string(pod.UID))
+				    }
 				}
 
 				klog.V(4).Infof("predicates with gpu sharing, update pod %s/%s deallocate from node [%s]", pod.Namespace, pod.Name, nodeName)
