@@ -177,3 +177,5 @@ The GPU scheduling algorithm is depicted as below:
 ### Reference
 NVIDIA_VISIBLE_DEVICES: https://github.com/NVIDIA/nvidia-container-runtime/blob/master/README.md#nvidia_visible_devices
 
+K8S-DEVICE-PLUGIN https://github.com/NVIDIA/k8s-device-plugin/blob/master/vendor/k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1/api.proto
+

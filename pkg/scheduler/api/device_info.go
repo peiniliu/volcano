@@ -70,3 +70,22 @@ func getGPUResourceOfContainer(container *v1.Container) uint {
 	}
 	return mem
 }
+
+
+// GetGPUNumberOfPod returns the number of GPUs required by the pod.
+func GetGPUNumberOfPod(pod *v1.Pod) int {
+	var gpus int
+	for _, container := range pod.Spec.Containers {
+	    gpus += getGPUNumberOfContainer(&container)
+	}
+	return gpus
+}
+
+// getGPUNumberOfContainer returns the number of GPUs required by the container.
+func getGPUNumberOfContainer(container *v1.Container) int {
+	var gpus int
+	if val, ok := container.Resources.Limits[VolcanoGPUNumber]; ok {
+		gpus = int(val.Value())
+	}
+	return gpus
+}

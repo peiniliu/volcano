@@ -114,21 +114,23 @@ func (pp *predicatesPlugin) OnSessionOpen(ssn *framework.Session) {
 				return
 			}
 
-			if predicate.gpuSharingEnable && api.GetGPUResourceOfPod(pod) > 0 {
+			if predicate.gpuSharingEnable && (api.GetGPUResourceOfPod(pod) > 0 || api.GetGPUNumberOfPod(pod) > 0) {
 				nodeInfo, _ := ssn.Nodes[nodeName]
-				id := predicateGPU(pod, nodeInfo)
-				if id < 0 {
+				ids := predicateGPU(pod, nodeInfo)
+				if ids == nil {
 					klog.Errorf("The node %s can't place the pod %s in ns %s", pod.Spec.NodeName, pod.Name, pod.Namespace)
 					return
 				}
-				patch := api.AddGPUIndexPatch(id)
+				patch := api.AddGPUIndexPatch(ids)
 				pod, err := kubeClient.CoreV1().Pods(pod.Namespace).Patch(context.TODO(), pod.Name, types.JSONPatchType, []byte(patch), metav1.PatchOptions{})
 				if err != nil {
 					klog.Errorf("Patch pod %s failed with patch %s: %v", pod.Name, patch, err)
 					return
 				}
-				dev, _ := nodeInfo.GPUDevices[id]
-				dev.PodMap[string(pod.UID)] = pod
+				for _, id := range ids {
+				    dev, _ := nodeInfo.GPUDevices[id]
+				    dev.PodMap[string(pod.UID)] = pod
+				}
 				klog.V(4).Infof("predicates with gpu sharing, update pod %s/%s allocate to node [%s]", pod.Namespace, pod.Name, nodeName)
 			}
 
@@ -144,9 +146,9 @@ func (pp *predicatesPlugin) OnSessionOpen(ssn *framework.Session) {
 				return
 			}
 
-			if predicate.gpuSharingEnable && api.GetGPUResourceOfPod(pod) > 0 {
+			if predicate.gpuSharingEnable && (api.GetGPUResourceOfPod(pod) > 0 || api.GetGPUNumberOfPod(pod) > 0) {
 				// deallocate pod gpu id
-				id := api.GetGPUIndex(pod)
+				ids := api.GetGPUIndex(pod)
 				patch := api.RemoveGPUIndexPatch()
 				_, err := kubeClient.CoreV1().Pods(pod.Namespace).Patch(context.TODO(), pod.Name, types.JSONPatchType, []byte(patch), metav1.PatchOptions{})
 				if err != nil {
@@ -155,8 +157,10 @@ func (pp *predicatesPlugin) OnSessionOpen(ssn *framework.Session) {
 				}
 
 				nodeInfo, _ := ssn.Nodes[nodeName]
-				if dev, ok := nodeInfo.GPUDevices[id]; ok {
-					delete(dev.PodMap, string(pod.UID))
+				for _, id := range ids {
+				    if dev, ok := nodeInfo.GPUDevices[id]; ok {
+					   delete(dev.PodMap, string(pod.UID))
+				    }
 				}
 
 				klog.V(4).Infof("predicates with gpu sharing, update pod %s/%s deallocate from node [%s]", pod.Namespace, pod.Name, nodeName)
