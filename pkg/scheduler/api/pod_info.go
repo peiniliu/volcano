@@ -144,11 +144,6 @@ func GetGPUIndex(pod *v1.Pod) []int {
 	if len(pod.Annotations) > 0 {
 		value, found := pod.Annotations[GPUIndex]
 		if found {
-			//id, err := strconv.Atoi(value)
-			//if err != nil {
-			//	klog.Errorf("invalid %s=%s", GPUIndex, value)
-			//	return nil
-			//}
 			ids := strings.Split(value, ",")
 			idSlice := make([]int, len(ids))
 			for idx, id := range ids {

@@ -222,7 +222,7 @@ func (pp *predicatesPlugin) OnSessionOpen(ssn *framework.Session) {
 				return
 			}
 
-			if predicate.gpuSharingEnable && (api.GetGPUResourceOfPod(pod) > 0 || api.GetGPUNumberOfPod(pod) > 0) {
+			if (predicate.gpuSharingEnable && api.GetGPUResourceOfPod(pod) > 0) || (predicate.gpuNumberEnable && api.GetGPUNumberOfPod(pod) > 0) {
 				// deallocate pod gpu id
 				ids := api.GetGPUIndex(pod)
 				patch := api.RemoveGPUIndexPatch()
