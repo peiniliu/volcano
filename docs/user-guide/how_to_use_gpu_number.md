@@ -1,4 +1,4 @@
-# GPU Resources User guide
+# GPU Number User guide
 
 ## Environment setup
 
@@ -33,7 +33,7 @@ data:
       - name: drf
       - name: predicates
         arguments:
-          predicate.GPUSharingEnable: true # enable gpu sharing
+          predicate.GPUNumberEnable: true # enable gpu number
       - name: proportion
       - name: nodeorder
       - name: binpack
@@ -79,12 +79,10 @@ status:
     volcano.sh/gpu-memory: "89424"
     volcano.sh/gpu-number: "8"   # GPU resource
 ```
-the yaml file shows that the node has 8 gpu and in total has 89424 memory.
 
-### Running Jobs requiring GPUs
+### Running Jobs With Multiple GPU Cards
 
-User can define the number of cards that can be used or visible in the container using `volcano.sh/gpu-number`, also NVIDIA GPUs can now be shared via container level resource requirements using the resource name `volcano.sh/gpu-memory`
-
+Jobs can have multiple exclusive NVIDIA GPUs cards via defining container level resource requirements `volcano.sh/gpu-number`:
 ```shell script
 $ cat <<EOF | kubectl apply -f -
 apiVersion: v1
@@ -100,7 +98,6 @@ spec:
       resources:
         limits:
           volcano.sh/gpu-number: 2 # requesting 2 gpu cards
-          volcano.sh/gpu-memory: 1024 # requesting 1024MB GPU memory
 EOF
 
 $ cat <<EOF | kubectl apply -f -
@@ -117,11 +114,10 @@ spec:
       resources:
         limits:
           volcano.sh/gpu-number: 2 # requesting 2 gpu cards
-          volcano.sh/gpu-memory: 1024 # requesting 1024MB GPU memory
 EOF
 ```
 
-If only the above pods are claiming gpu resource in a cluster, you can see the pods sharing 2 gpu cards:
+If the above pods claim multiple gpu cards, you can see each of them has exclusive gpu cards:
 
 ```shell script
 $ kubectl exec -ti  gpu-pod1 env
@@ -135,21 +131,18 @@ $ kubectl exec -ti  gpu-pod1 env
 ...
 VOLCANO_GPU_TOTAL=11178
 VOLCANO_GPU_ALLOCATED=1024
-NVIDIA_VISIBLE_DEVICES=0,1
+NVIDIA_VISIBLE_DEVICES=2,3
 ...
 ```
+### Understanding How Multiple GPU Cards Requirement Works 
 
+The main architecture is similar as the previous, but the gpu-index results of each pod will be a list of gpu cards index. 
 
+![gpu_number](../images/volcano-gpunumber.png)
 
-### Understanding how GPU sharing works
+1. create a pod with `volcano.sh/gpu-number` resource request,
 
-The GPU sharing workflow is depicted as below:
-
-![gpu_sharing](../images/volcano-gpu.png)
-
-1. create a pod with `volcano.sh/gpu-number` and `volcano.sh/gpu-memory` resource request,
-
-2. volcano scheduler predicates and allocate gpu resource for the pod. Adding the below annotation
+2. volcano scheduler predicates and allocate gpu cards to the pod. Add the below annotation
 
 ```yaml
 annotations:
@@ -157,7 +150,7 @@ annotations:
   volcano.sh/predicate-time: “1593764466550835304”
 ```
 
-3. kubelet watches the pod bound to itself, and call allocate API to set env before running the container.
+3. kubelet watches the pod bound to itself, and calls allocate API to set env before running the container.
 
 ```yaml
 env:
@@ -165,17 +158,3 @@ env:
   VOLCANO_GPU_ALLOCATED: “1024” # GPU allocated
   VOLCANO_GPU_TOTAL: “11178” # GPU memory of the card
 ```
-
-
-### GPU scheduling algorithm
-
-
-The GPU scheduling algorithm is depicted as below:
-
-![gpu_allocate](../images/volcano-gpu-algorithmsmall.png)
-
-### Reference
-NVIDIA_VISIBLE_DEVICES: https://github.com/NVIDIA/nvidia-container-runtime/blob/master/README.md#nvidia_visible_devices
-
-K8S-DEVICE-PLUGIN https://github.com/NVIDIA/k8s-device-plugin/blob/master/vendor/k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1/api.proto
-
