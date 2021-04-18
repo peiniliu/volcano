@@ -46,6 +46,7 @@ const (
 
 	// GPUSharingPredicate is the key for enabling GPU Sharing Predicate in YAML
 	GPUSharingPredicate = "predicate.GPUSharingEnable"
+	GPUNumberPredicate = "predicate.GPUNumberEnable"
 
 	// CachePredicate control cache predicate feature
 	CachePredicate = "predicate.CacheEnable"
@@ -79,6 +80,7 @@ type baseResource struct {
 
 type predicateEnable struct {
 	gpuSharingEnable   bool
+	gpuNumberEnable    bool
 	cacheEnable        bool
 	proportionalEnable bool
 	proportional       map[v1.ResourceName]baseResource
@@ -100,6 +102,7 @@ func enablePredicate(args framework.Arguments) predicateEnable {
 	     - name: predicates
 	       arguments:
 	         predicate.GPUSharingEnable: true
+	         predicate.GPUNumberEnable: true
 	         predicate.CacheEnable: true
 	         predicate.ProportionalEnable: true
 	         predicate.resources: nvidia.com/gpu
@@ -111,12 +114,19 @@ func enablePredicate(args framework.Arguments) predicateEnable {
 
 	predicate := predicateEnable{
 		gpuSharingEnable:   false,
+		gpuNumberEnable:    false,
 		cacheEnable:        false,
 		proportionalEnable: false,
 	}
 
 	// Checks whether predicate.GPUSharingEnable is provided or not, if given, modifies the value in predicateEnable struct.
 	args.GetBool(&predicate.gpuSharingEnable, GPUSharingPredicate)
+	args.GetBool(&predicate.gpuNumberEnable, GPUNumberPredicate)
+
+        if predicate.gpuSharingEnable && predicate.gpuNumberEnable{
+            klog.Errorf("can not define true in both gpu sharing and gpu number")
+	}
+
 	args.GetBool(&predicate.cacheEnable, CachePredicate)
 	// Checks whether predicate.ProportionalEnable is provided or not, if given, modifies the value in predicateEnable struct.
 	args.GetBool(&predicate.proportionalEnable, ProportionalPredicate)
@@ -358,6 +368,16 @@ func (pp *predicatesPlugin) OnSessionOpen(ssn *framework.Session) {
 				return err
 			}
 			klog.V(4).Infof("checkNodeResourceIsProportional predicates Task <%s/%s> on Node <%s>: fit %v",
+				task.Namespace, task.Name, node.Name, fit)
+		}
+		if predicate.gpuNumberEnable {
+			//CheckGPUNumberPredicate
+			fit, err := checkNodeGPUNumberPredicate(task.Pod, node)
+			if err != nil{
+				return err
+			}
+
+			klog.V(4).Infof("checkNodeGPUNumberPredicate predicates Task <%s/%s> on Node <%s>: fit %v",
 				task.Namespace, task.Name, node.Name, fit)
 		}
 		return nil

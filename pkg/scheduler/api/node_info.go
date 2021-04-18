@@ -496,6 +496,18 @@ func (ni *NodeInfo) getDevicesAllGPUMemory() map[int]uint {
 	return res
 }
 
+// GetDevicesIdleGPU returns all the idle gpu card.
+func (ni *NodeInfo) GetDevicesIdleGPUs() []int {
+	res := []int{}
+	for _, device := range ni.GPUDevices {
+		if device.isIdleGPU(){
+            res = append(res, device.ID)
+		}
+	}
+	return res
+}
+
+
 // AddGPUResource adds the pod to GPU pool if it is assigned
 func (ni *NodeInfo) AddGPUResource(pod *v1.Pod) {
 	gpuRes := GetGPUResourceOfPod(pod)
