@@ -500,13 +500,12 @@ func (ni *NodeInfo) getDevicesAllGPUMemory() map[int]uint {
 func (ni *NodeInfo) GetDevicesIdleGPUs() []int {
 	res := []int{}
 	for _, device := range ni.GPUDevices {
-		if device.isIdleGPU(){
-            res = append(res, device.ID)
+		if device.isIdleGPU() {
+			res = append(res, device.ID)
 		}
 	}
 	return res
 }
-
 
 // AddGPUResource adds the pod to GPU pool if it is assigned
 func (ni *NodeInfo) AddGPUResource(pod *v1.Pod) {
@@ -514,9 +513,9 @@ func (ni *NodeInfo) AddGPUResource(pod *v1.Pod) {
 	if gpuRes > 0 {
 		ids := GetGPUIndex(pod)
 		for _, id := range ids {
-		   if dev := ni.GPUDevices[id]; dev != nil {
-		   	  dev.PodMap[string(pod.UID)] = pod
-		   }
+			if dev := ni.GPUDevices[id]; dev != nil {
+				dev.PodMap[string(pod.UID)] = pod
+			}
 		}
 	}
 }
@@ -527,9 +526,9 @@ func (ni *NodeInfo) SubGPUResource(pod *v1.Pod) {
 	if gpuRes > 0 {
 		ids := GetGPUIndex(pod)
 		for _, id := range ids {
-		   if dev := ni.GPUDevices[id]; dev != nil {
-		   	  delete(dev.PodMap, string(pod.UID))
-		   }
+			if dev := ni.GPUDevices[id]; dev != nil {
+				delete(dev.PodMap, string(pod.UID))
+			}
 		}
 	}
 }

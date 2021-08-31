@@ -25,7 +25,6 @@ import (
 	"volcano.sh/volcano/pkg/scheduler/api"
 )
 
-
 // checkNodeGPUSharingPredicate checks if a pod with gpu requirement can be scheduled on a node.
 func checkNodeGPUSharingPredicate(pod *v1.Pod, nodeInfo *api.NodeInfo) (bool, error) {
 	// no gpu sharing request
@@ -42,13 +41,13 @@ func checkNodeGPUSharingPredicate(pod *v1.Pod, nodeInfo *api.NodeInfo) (bool, er
 func checkNodeGPUNumberPredicate(pod *v1.Pod, nodeInfo *api.NodeInfo) (bool, error) {
 	//no gpu number request
 	if api.GetGPUNumberOfPod(pod) <= 0 {
-        return true, nil
+		return true, nil
 	}
 	ids := predicateGPUbyNumber(pod, nodeInfo)
-	if ids == nil{
+	if ids == nil {
 		return false, fmt.Errorf("no enough gpu number on node %s", nodeInfo.Name)
 	}
-    return true, nil
+	return true, nil
 }
 
 // predicateGPU returns the available GPU ID
@@ -79,15 +78,15 @@ func predicateGPUbyNumber(pod *v1.Pod, node *api.NodeInfo) []int {
 	var devIDs []int
 
 	if len(allocatableGPUs) < gpuRequest {
-	  	klog.Errorf("Not enough gpu cards")
-	   	return nil
-	} 
+		klog.Errorf("Not enough gpu cards")
+		return nil
+	}
 
 	for devID := 0; devID < len(allocatableGPUs); devID++ {
 		devIDs = append(devIDs, allocatableGPUs[devID])
-		if len(devIDs) == gpuRequest{
-			return devIDs;
-	    }
+		if len(devIDs) == gpuRequest {
+			return devIDs
+		}
 	}
 
 	return nil

@@ -46,7 +46,7 @@ const (
 
 	// GPUSharingPredicate is the key for enabling GPU Sharing Predicate in YAML
 	GPUSharingPredicate = "predicate.GPUSharingEnable"
-	GPUNumberPredicate = "predicate.GPUNumberEnable"
+	GPUNumberPredicate  = "predicate.GPUNumberEnable"
 
 	// CachePredicate control cache predicate feature
 	CachePredicate = "predicate.CacheEnable"
@@ -123,8 +123,8 @@ func enablePredicate(args framework.Arguments) predicateEnable {
 	args.GetBool(&predicate.gpuSharingEnable, GPUSharingPredicate)
 	args.GetBool(&predicate.gpuNumberEnable, GPUNumberPredicate)
 
-    if predicate.gpuSharingEnable && predicate.gpuNumberEnable{
-            klog.Errorf("can not define true in both gpu sharing and gpu number")
+	if predicate.gpuSharingEnable && predicate.gpuNumberEnable {
+		klog.Errorf("can not define true in both gpu sharing and gpu number")
 	}
 
 	args.GetBool(&predicate.cacheEnable, CachePredicate)
@@ -183,7 +183,7 @@ func (pp *predicatesPlugin) OnSessionOpen(ssn *framework.Session) {
 			}
 
 			//predicate gpu sharing
-			if predicate.gpuSharingEnable && api.GetGPUResourceOfPod(pod) > 0  {
+			if predicate.gpuSharingEnable && api.GetGPUResourceOfPod(pod) > 0 {
 				nodeInfo, ok := ssn.Nodes[nodeName]
 				if !ok {
 					klog.Errorf("Failed to get node %s info from cache", nodeName)
@@ -201,18 +201,18 @@ func (pp *predicatesPlugin) OnSessionOpen(ssn *framework.Session) {
 					return
 				}
 				for _, id := range ids {
-				    dev, ok := nodeInfo.GPUDevices[id]
-				    if !ok {
-					    klog.Errorf("Failed to get GPU %d from node %s", id, nodeName)
-					    return
-				    } 
-				    dev.PodMap[string(pod.UID)] = pod
+					dev, ok := nodeInfo.GPUDevices[id]
+					if !ok {
+						klog.Errorf("Failed to get GPU %d from node %s", id, nodeName)
+						return
+					}
+					dev.PodMap[string(pod.UID)] = pod
 				}
 				klog.V(4).Infof("predicates with gpu sharing, update pod %s/%s allocate to node [%s]", pod.Namespace, pod.Name, nodeName)
 			}
 
 			//predicate gpu number
-			if predicate.gpuNumberEnable &&  api.GetGPUNumberOfPod(pod) > 0 {
+			if predicate.gpuNumberEnable && api.GetGPUNumberOfPod(pod) > 0 {
 				nodeInfo, ok := ssn.Nodes[nodeName]
 				if !ok {
 					klog.Errorf("Failed to get node %s info from cache", nodeName)
@@ -230,12 +230,12 @@ func (pp *predicatesPlugin) OnSessionOpen(ssn *framework.Session) {
 					return
 				}
 				for _, id := range ids {
-				    dev, ok := nodeInfo.GPUDevices[id]
-				    if !ok {
-					    klog.Errorf("Failed to get GPU %d from node %s", id, nodeName)
-					    return
-				    } 
-				    dev.PodMap[string(pod.UID)] = pod
+					dev, ok := nodeInfo.GPUDevices[id]
+					if !ok {
+						klog.Errorf("Failed to get GPU %d from node %s", id, nodeName)
+						return
+					}
+					dev.PodMap[string(pod.UID)] = pod
 				}
 				klog.V(4).Infof("predicates with gpu number, update pod %s/%s allocate to node [%s]", pod.Namespace, pod.Name, nodeName)
 			}
@@ -268,9 +268,9 @@ func (pp *predicatesPlugin) OnSessionOpen(ssn *framework.Session) {
 					return
 				}
 				for _, id := range ids {
-				    if dev, ok := nodeInfo.GPUDevices[id]; ok {
-					   delete(dev.PodMap, string(pod.UID))
-				    }
+					if dev, ok := nodeInfo.GPUDevices[id]; ok {
+						delete(dev.PodMap, string(pod.UID))
+					}
 				}
 
 				klog.V(4).Infof("predicates with gpu sharing, update pod %s/%s deallocate from node [%s]", pod.Namespace, pod.Name, nodeName)
@@ -403,7 +403,7 @@ func (pp *predicatesPlugin) OnSessionOpen(ssn *framework.Session) {
 		if predicate.gpuNumberEnable {
 			//CheckGPUNumberPredicate
 			fit, err := checkNodeGPUNumberPredicate(task.Pod, node)
-			if err != nil{
+			if err != nil {
 				return err
 			}
 

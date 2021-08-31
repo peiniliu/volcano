@@ -147,13 +147,13 @@ func GetGPUIndex(pod *v1.Pod) []int {
 			ids := strings.Split(value, ",")
 			idSlice := make([]int, len(ids))
 			for idx, id := range ids {
-			   j, err := strconv.Atoi(id)
-			   if err != nil {
-			   	klog.Errorf("invalid %s=%s", GPUIndex, value)
-			   	return nil
-			   }
-			   idSlice[idx] = j
-			} 
+				j, err := strconv.Atoi(id)
+				if err != nil {
+					klog.Errorf("invalid %s=%s", GPUIndex, value)
+					return nil
+				}
+				idSlice[idx] = j
+			}
 			return idSlice
 		}
 	}
@@ -170,7 +170,7 @@ func escapeJSONPointer(p string) string {
 
 // AddGPUIndexPatch returns the patch adding GPU index
 func AddGPUIndexPatch(ids []int) string {
-    idsstring := strings.Trim(strings.Replace(fmt.Sprint(ids), " ", ",", -1), "[]")
+	idsstring := strings.Trim(strings.Replace(fmt.Sprint(ids), " ", ",", -1), "[]")
 	return fmt.Sprintf(`[{"op": "add", "path": "/metadata/annotations/%s", "value":"%d"},`+
 		`{"op": "add", "path": "/metadata/annotations/%s", "value": "%s"}]`,
 		escapeJSONPointer(PredicateTime), time.Now().UnixNano(),
