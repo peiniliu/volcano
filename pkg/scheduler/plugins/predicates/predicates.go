@@ -123,7 +123,7 @@ func enablePredicate(args framework.Arguments) predicateEnable {
 	args.GetBool(&predicate.gpuSharingEnable, GPUSharingPredicate)
 	args.GetBool(&predicate.gpuNumberEnable, GPUNumberPredicate)
 
-        if predicate.gpuSharingEnable && predicate.gpuNumberEnable{
+    if predicate.gpuSharingEnable && predicate.gpuNumberEnable{
             klog.Errorf("can not define true in both gpu sharing and gpu number")
 	}
 
@@ -182,13 +182,14 @@ func (pp *predicatesPlugin) OnSessionOpen(ssn *framework.Session) {
 				return
 			}
 
-			if predicate.gpuSharingEnable && (api.GetGPUResourceOfPod(pod) > 0 || api.GetGPUNumberOfPod(pod) > 0) {
+			//predicate gpu sharing
+			if predicate.gpuSharingEnable && api.GetGPUResourceOfPod(pod) > 0  {
 				nodeInfo, ok := ssn.Nodes[nodeName]
 				if !ok {
 					klog.Errorf("Failed to get node %s info from cache", nodeName)
 					return
 				}
-				ids := predicateGPU(pod, nodeInfo)
+				ids := predicateGPUbyMemory(pod, nodeInfo)
 				if ids == nil {
 					klog.Errorf("The node %s can't place the pod %s in ns %s", pod.Spec.NodeName, pod.Name, pod.Namespace)
 					return
@@ -202,12 +203,41 @@ func (pp *predicatesPlugin) OnSessionOpen(ssn *framework.Session) {
 				for _, id := range ids {
 				    dev, ok := nodeInfo.GPUDevices[id]
 				    if !ok {
-					klog.Errorf("Failed to get GPU %d from node %s", id, nodeName)
-					return
+					    klog.Errorf("Failed to get GPU %d from node %s", id, nodeName)
+					    return
 				    } 
 				    dev.PodMap[string(pod.UID)] = pod
 				}
 				klog.V(4).Infof("predicates with gpu sharing, update pod %s/%s allocate to node [%s]", pod.Namespace, pod.Name, nodeName)
+			}
+
+			//predicate gpu number
+			if predicate.gpuNumberEnable &&  api.GetGPUNumberOfPod(pod) > 0 {
+				nodeInfo, ok := ssn.Nodes[nodeName]
+				if !ok {
+					klog.Errorf("Failed to get node %s info from cache", nodeName)
+					return
+				}
+				ids := predicateGPUbyNumber(pod, nodeInfo)
+				if ids == nil {
+					klog.Errorf("The node %s can't place the pod %s in ns %s", pod.Spec.NodeName, pod.Name, pod.Namespace)
+					return
+				}
+				patch := api.AddGPUIndexPatch(ids)
+				pod, err := kubeClient.CoreV1().Pods(pod.Namespace).Patch(context.TODO(), pod.Name, types.JSONPatchType, []byte(patch), metav1.PatchOptions{})
+				if err != nil {
+					klog.Errorf("Patch pod %s failed with patch %s: %v", pod.Name, patch, err)
+					return
+				}
+				for _, id := range ids {
+				    dev, ok := nodeInfo.GPUDevices[id]
+				    if !ok {
+					    klog.Errorf("Failed to get GPU %d from node %s", id, nodeName)
+					    return
+				    } 
+				    dev.PodMap[string(pod.UID)] = pod
+				}
+				klog.V(4).Infof("predicates with gpu number, update pod %s/%s allocate to node [%s]", pod.Namespace, pod.Name, nodeName)
 			}
 
 			node.AddPod(pod)
