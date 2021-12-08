@@ -18,6 +18,7 @@ package cache
 
 import (
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/controller/volume/scheduling"
 
@@ -34,13 +35,13 @@ type Cache interface {
 	Snapshot() *api.ClusterInfo
 
 	// WaitForCacheSync waits for all cache synced
-	WaitForCacheSync(stopCh <-chan struct{}) bool
+	WaitForCacheSync(stopCh <-chan struct{})
 
-	// Bind binds Task to the target host.
+	// AddBindTask binds Task to the target host.
 	// TODO(jinzhej): clean up expire Tasks.
-	Bind(task *api.TaskInfo, hostname string) error
+	AddBindTask(task *api.TaskInfo) error
 
-	// Bind Pod/PodGroup to cluster
+	// BindPodGroup Pod/PodGroup to cluster
 	BindPodGroup(job *api.JobInfo, cluster string) error
 
 	// Evict evicts the task to release resources.
@@ -65,6 +66,9 @@ type Cache interface {
 	Client() kubernetes.Interface
 
 	UpdateSchedulerNumaInfo(sets map[string]api.ResNumaSets) error
+
+	// SharedInformerFactory return scheduler SharedInformerFactory
+	SharedInformerFactory() informers.SharedInformerFactory
 }
 
 // VolumeBinder interface for allocate and bind volumes
@@ -76,7 +80,7 @@ type VolumeBinder interface {
 
 //Binder interface for binding task and hostname
 type Binder interface {
-	Bind(task *v1.Pod, hostname string) error
+	Bind(kubeClient *kubernetes.Clientset, tasks []*api.TaskInfo) (error, []*api.TaskInfo)
 }
 
 // Evictor interface for evict pods
