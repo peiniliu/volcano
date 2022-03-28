@@ -245,9 +245,12 @@ func (p *taskGroupPlugin) PredicateFn(task *api.TaskInfo, node *api.NodeInfo) er
 			p.Name(), task.Name, task.Job)
 	}
 
-	if len(jobManager.nodeGroupSet) == jobManager.taskGroups[task.Name] {
+	klog.V(3).Infof("PredicateFn task %s to nodes %s", task.Name, node.Name)
+
+	if len(jobManager.nodeGroupSet) >= jobManager.taskGroups[task.Name] {
 		//enough group
-		klog.V(3).Infof("enough current used number of nodes %s", len(jobManager.nodeGroupSet))
+		klog.V(3).Infof("Current used number of nodes %s/reqired nodes %s",
+			len(jobManager.nodeGroupSet), jobManager.taskGroups[task.Name])
 		_, ok := jobManager.nodeGroupSet[node.Name]
 		if ok {
 			return nil

@@ -1,6 +1,6 @@
-#docker stop registry
-#docker rm registry
-#docker container prune
+docker stop registry
+docker rm registry
+docker container prune
 
 make clean
 make image_bins
