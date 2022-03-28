@@ -206,7 +206,7 @@ spec:
   ports:
     - port: 8080
       targetPort: 9090 
-      nodePort: 30013
+      nodePort: 30003
 ---
 # Source: volcano/templates/prometheus.yaml
 apiVersion: apps/v1
@@ -519,7 +519,7 @@ spec:
   ports:
     - port: 3000
       targetPort: 3000
-      nodePort: 30014
+      nodePort: 30004
 ---
 # Source: volcano/templates/grafana.yaml
 apiVersion: apps/v1
