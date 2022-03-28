@@ -1,9 +1,9 @@
 apiVersion: batch.volcano.sh/v1alpha1
 kind: Job
 metadata:
-  name: lm-mpi-job
+  name: mpi-benchmark
 spec:
-  minAvailable: 3
+  minAvailable: 16
   schedulerName: volcano
   plugins:
     ssh: []
@@ -23,15 +23,17 @@ spec:
                 - |
                   MPI_HOST=`cat /etc/volcano/mpiworker.host | tr "\n" ","`;
                   mkdir -p /var/run/sshd; /usr/sbin/sshd;
-                  mpiexec --allow-run-as-root --host ${MPI_HOST} --npernode 2 -np 4 mpi_hello_world;
-              image: volcanosh/example-mpi:0.0.1
+                  cp /opt/results/hpccinf.txt /home;
+                  mpirun --allow-run-as-root --host ${MPI_HOST} --nooversubscribe --mca mpi_yield_when_idle 0 --mca btl ^openib,uct --mca pml ucx --display-devel-map --display-allocation --report-bindings -np 16 /opt/HPCC1.5.0-MPI/bin/hpccfft;
+              image: mpinetworktrace
               name: mpimaster
               ports:
                 - containerPort: 22
                   name: mpijob-port
               workingDir: /home
+              imagePullPolicy: IfNotPresent
           restartPolicy: OnFailure
-    - replicas: 2
+    - replicas: 16
       name: mpiworker
       template:
         spec:
@@ -40,12 +42,14 @@ spec:
                 - /bin/sh
                 - -c
                 - |
+                  cp /opt/results/hpccinf.txt /home;
                   mkdir -p /var/run/sshd; /usr/sbin/sshd -D;
-              image: volcanosh/example-mpi:0.0.1
+              image: mpinetworktrace
               name: mpiworker
               ports:
                 - containerPort: 22
                   name: mpijob-port
               workingDir: /home
+              imagePullPolicy: IfNotPresent
           restartPolicy: OnFailure
 ---

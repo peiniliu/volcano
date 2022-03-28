@@ -240,6 +240,7 @@ func validateJobUpdate(old, new *v1alpha1.Job) error {
 	if len(old.Spec.Tasks) != len(new.Spec.Tasks) {
 		return fmt.Errorf("job updates may not add or remove tasks")
 	}
+
 	// other fields under spec are not allowed to mutate
 	new.Spec.MinAvailable = old.Spec.MinAvailable
 	new.Spec.PriorityClassName = old.Spec.PriorityClassName

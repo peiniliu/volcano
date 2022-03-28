@@ -34,4 +34,7 @@ spec:
               resources:
                 requests:
                   cpu: "1"
+              ports:
+                - containerPort: 22
+                  name: mpijob-port
           restartPolicy: OnFailure

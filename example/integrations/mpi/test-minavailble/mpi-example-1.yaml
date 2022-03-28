@@ -1,9 +1,9 @@
 apiVersion: batch.volcano.sh/v1alpha1
 kind: Job
 metadata:
-  name: lm-mpi-job
+  name: jobminavailableless
 spec:
-  minAvailable: 3
+  minAvailable: 2
   schedulerName: volcano
   plugins:
     ssh: []
@@ -23,7 +23,7 @@ spec:
                 - |
                   MPI_HOST=`cat /etc/volcano/mpiworker.host | tr "\n" ","`;
                   mkdir -p /var/run/sshd; /usr/sbin/sshd;
-                  mpiexec --allow-run-as-root --host ${MPI_HOST} --npernode 2 -np 4 mpi_hello_world;
+                  mpiexec --allow-run-as-root --host ${MPI_HOST} -np 2 mpi_hello_world;
               image: volcanosh/example-mpi:0.0.1
               name: mpimaster
               ports:

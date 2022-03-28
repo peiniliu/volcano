@@ -1,0 +1,23 @@
+apiVersion: batch.volcano.sh/v1alpha1
+kind: Job
+metadata:
+  name: vj-test-singlenuma
+spec:
+  schedulerName: volcano
+  minAvailable: 1
+  tasks:
+    - replicas: 1
+      name: "test"
+      #topologyPolicy: single-numa-node # set the topology policy for task 
+      template:
+        spec:
+          containers:
+            - image: alpine
+              command: ["/bin/sh", "-c", "sleep 1000"]
+              imagePullPolicy: IfNotPresent
+              name: running
+              resources:
+                limits:
+                  cpu: 1
+                  memory: "100Mi"
+          restartPolicy: OnFailure

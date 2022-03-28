@@ -1,0 +1,23 @@
+apiVersion: batch.volcano.sh/v1alpha1
+kind: Job
+metadata:
+  name: vj-test
+spec:
+  schedulerName: volcano
+  minAvailable: 5
+  tasks:
+    - replicas: 5
+      name: "test"
+      topologyPolicy: best-effort # set the topology policy for task 
+      template:
+        spec:
+          containers:
+            - image: alpine
+              command: ["/bin/sh", "-c", "sleep 1000"]
+              imagePullPolicy: IfNotPresent
+              name: running
+              resources:
+                limits:
+                  cpu: 6
+                  memory: "100Mi"
+          restartPolicy: OnFailure
