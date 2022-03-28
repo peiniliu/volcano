@@ -14,8 +14,11 @@
 
 BIN_DIR=_output/bin
 RELEASE_DIR=_output/release
-REPO_PATH=volcano.sh/volcano
-IMAGE_PREFIX=volcanosh/vc
+#REPO_PATH=volcano.sh/volcano
+#IMAGE_PREFIX=volcanosh/vc
+REPO_PATH=172.30.0.49:5000
+IMAGE_PREFIX=172.30.0.49:5000/vc
+TAG=latest
 CRD_OPTIONS ?= "crd:crdVersions=v1,generateEmbeddedObjectMeta=true"
 CC ?= "gcc"
 SUPPORT_PLUGINS ?= "no"
@@ -99,6 +102,7 @@ images: image_bins
 		fi;\
 		rm installer/dockerfile/$$name/vc-$$name;\
 	done
+
 
 webhook-manager-base-image:
 	if [ ${REL_OSARCH} = linux/amd64 ];then\

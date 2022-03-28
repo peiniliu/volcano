@@ -227,6 +227,15 @@ func patchDefaultPlugins(job *v1alpha1.Job) *patchOperation {
 		}
 	}
 
+	if _, ok := job.Spec.Plugins["mpi"]; ok {
+		if _, ok := plugins["svc"]; !ok {
+			plugins["svc"] = []string{}
+		}
+		if _, ok := plugins["ssh"]; !ok {
+			plugins["ssh"] = []string{}
+		}
+	}
+
 	return &patchOperation{
 		Op:    "replace",
 		Path:  "/spec/plugins",
