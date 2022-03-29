@@ -247,20 +247,28 @@ func (p *taskGroupPlugin) PredicateFn(task *api.TaskInfo, node *api.NodeInfo) er
 
 	klog.V(3).Infof("PredicateFn task %s to nodes %s", task.Name, node.Name)
 
-	if len(jobManager.nodeGroupSet) >= jobManager.taskGroups[task.Name] {
-		//enough group
-		klog.V(3).Infof("Current used number of nodes %s/reqired nodes %s",
-			len(jobManager.nodeGroupSet), jobManager.taskGroups[task.Name])
-		_, ok := jobManager.nodeGroupSet[node.Name]
-		if ok {
-			return nil
-		} else {
-			return fmt.Errorf("plugin %s predicates node %s for task %s/job %s failed due to group restriction",
-				p.Name(), node.Name, task.Name, task.Job)
-		}
-	} else {
-		return nil
+	taskName := getTaskName(task)
+	if taskName == "" {
+		return fmt.Errorf("plugin %s predicates no taskname %s",
+			p.Name(), taskName)
 	}
+
+	if nGroups, hasGroup := jobManager.taskGroups[taskName]; !hasGroup {
+		if len(jobManager.nodeGroupSet) >= nGroups {
+			//enough group
+			klog.V(3).Infof("Current used number of nodes %d/reqired nodes %d",
+				len(jobManager.nodeGroupSet), nGroups)
+			_, ok := jobManager.nodeGroupSet[node.Name]
+			if ok {
+				return nil
+			} else {
+				return fmt.Errorf("plugin %s predicates node %s for task %s/job %s failed due to group restriction",
+					p.Name(), node.Name, task.Name, task.Job)
+			}
+		}
+	}
+
+	return nil
 
 }
 
