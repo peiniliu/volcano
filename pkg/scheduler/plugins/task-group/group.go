@@ -67,7 +67,13 @@ func (s SortByScore) Len() int {
 }
 
 func (s SortByScore) Less(i, j int) bool {
-	return s[i].reqScore < s[j].reqScore
+	if s[i].reqScore < s[j].reqScore {
+		return true
+	} else if s[i].reqScore == s[j].reqScore {
+		return s[i].index < s[j].index
+	} else {
+		return false
+	}
 }
 
 func (s SortByScore) Swap(i, j int) {
