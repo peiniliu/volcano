@@ -126,6 +126,7 @@ spec:
         app: volcano-admission
     spec:
       serviceAccount: volcano-admission
+      nodeName: nxt2030
       containers:
         - args:
             - --tls-cert-file=/admission.local.config/certificates/tls.crt
@@ -170,6 +171,7 @@ spec:
     spec:
       serviceAccountName: volcano-admission
       restartPolicy: Never
+      nodeName: nxt2030
       containers:
         - name: main
           image: 172.30.0.49:5000/vc-webhook-manager:latest
@@ -8467,6 +8469,7 @@ spec:
       labels:
         app: volcano-controller
     spec:
+      nodeName: nxt2030
       serviceAccount: volcano-controllers
       containers:
           - name: volcano-controllers
@@ -8618,6 +8621,7 @@ spec:
         app: volcano-scheduler
     spec:
       serviceAccount: volcano-scheduler
+      nodeName: nxt2030
       containers:
         - name: volcano-scheduler
           image: 172.30.0.49:5000/vc-scheduler:latest

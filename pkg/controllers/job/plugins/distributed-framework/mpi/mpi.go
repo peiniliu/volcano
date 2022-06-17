@@ -199,30 +199,31 @@ func (mp *mpiPlugin) calcPodResource(pod *v1.Pod, job *batch.Job) {
 			for i, _ := range pod.Spec.Containers {
 				pod.Spec.Containers[i].Resources = resourceRequirements
 			}
-		} else if pod.Annotations[v1alpha1.TaskSpecKey] == mp.masterName {
-			var memorySize resource.Quantity
-			var cpuSize resource.Quantity
-			for i := 0; i < mp.nTasks; i++ {
-				memorySize.Add(resource.MustParse("5Mi"))
-				cpuSize.Add(resource.MustParse("5m"))
-			}
-			resourceRequirements := v1.ResourceRequirements{
-				Limits: v1.ResourceList{
-					v1.ResourceCPU:    cpuSize,
-					v1.ResourceMemory: memorySize,
-				},
-				Requests: v1.ResourceList{
-					v1.ResourceCPU:    cpuSize,
-					v1.ResourceMemory: memorySize,
-				},
-			}
-			for i, _ := range pod.Spec.Containers {
-				pod.Spec.Containers[i].Resources = resourceRequirements
-			}
 		}
-
 	}
 }
+
+// else if pod.Annotations[v1alpha1.TaskSpecKey] == mp.masterName {
+// 	var memorySize resource.Quantity
+// 	var cpuSize resource.Quantity
+// 	for i := 0; i < mp.nTasks; i++ {
+// 		memorySize.Add(resource.MustParse("5Mi"))
+// 		cpuSize.Add(resource.MustParse("50m"))
+// 	}
+// 	resourceRequirements := v1.ResourceRequirements{
+// 		Limits: v1.ResourceList{
+// 			v1.ResourceCPU:    cpuSize,
+// 			v1.ResourceMemory: memorySize,
+// 		},
+// 		Requests: v1.ResourceList{
+// 			v1.ResourceCPU:    cpuSize,
+// 			v1.ResourceMemory: memorySize,
+// 		},
+// 	}
+// 	for i, _ := range pod.Spec.Containers {
+// 		pod.Spec.Containers[i].Resources = resourceRequirements
+// 	}
+// }
 
 func (mp *mpiPlugin) mountConfigmap(pod *v1.Pod, job *batch.Job) {
 	cmName := mp.cmName(job)

@@ -113,29 +113,31 @@ func (p *taskGroupPlugin) TaskOrderFn(l interface{}, r interface{}) int {
 		return 0
 	}
 
-	// the big bucket should prior to small one
-	lvHasTask := len(lvBucket.tasks)
-	rvHasTask := len(rvBucket.tasks)
-	if lvHasTask != rvHasTask {
-		if lvHasTask > rvHasTask {
-			return -1
-		}
-		return 1
-	}
+	return 0
 
-	lvBucketIndex := lvBucket.index
-	rvBucketIndex := rvBucket.index
-	// in the same bucket, the taskOrder is ok
-	if lvBucketIndex == rvBucketIndex {
-		taskOrder := lvJobManager.taskGroupOrder(lv, rv)
-		return -taskOrder
-	}
+	// // the big bucket should prior to small one
+	// lvHasTask := len(lvBucket.tasks)
+	// rvHasTask := len(rvBucket.tasks)
+	// if lvHasTask != rvHasTask {
+	// 	if lvHasTask > rvHasTask {
+	// 		return -1
+	// 	}
+	// 	return 1
+	// }
 
-	// the old bucket should prior to young one
-	if lvBucketIndex < rvBucketIndex {
-		return -1
-	}
-	return 1
+	// lvBucketIndex := lvBucket.index
+	// rvBucketIndex := rvBucket.index
+	// // in the same bucket, the taskOrder is ok
+	// if lvBucketIndex == rvBucketIndex {
+	// 	taskOrder := lvJobManager.taskGroupOrder(lv, rv)
+	// 	return -taskOrder
+	// }
+
+	// // the old bucket should prior to young one
+	// if lvBucketIndex < rvBucketIndex {
+	// 	return -1
+	// }
+	// return 1
 }
 
 func (p *taskGroupPlugin) calcGroupScore(task *api.TaskInfo, node *api.NodeInfo) (int, *JobManager, error) {
@@ -151,7 +153,7 @@ func (p *taskGroupPlugin) calcGroupScore(task *api.TaskInfo, node *api.NodeInfo)
 	}
 
 	group := jobManager.GetGroupByTask(task)
-	// task out of bucket
+	// task out of group
 	if group == nil {
 		return 0, jobManager, nil
 	}
@@ -253,17 +255,34 @@ func (p *taskGroupPlugin) PredicateFn(task *api.TaskInfo, node *api.NodeInfo) er
 			p.Name(), taskName)
 	}
 
-	if nGroups, hasGroup := jobManager.taskGroups[taskName]; !hasGroup {
-		if len(jobManager.nodeGroupSet) >= nGroups {
-			//enough group
-			klog.V(3).Infof("Current used number of nodes %d/reqired nodes %d",
-				len(jobManager.nodeGroupSet), nGroups)
-			_, ok := jobManager.nodeGroupSet[node.Name]
-			if ok {
-				return nil
-			} else {
-				return fmt.Errorf("plugin %s predicates node %s for task %s/job %s failed due to group restriction",
-					p.Name(), node.Name, task.Name, task.Job)
+	group := jobManager.GetGroupByTask(task)
+	// task out of group
+	if group == nil {
+		return nil
+	}
+
+	if len(group.node) == 0 {
+		//new group to be allocated
+		groupSet, hasGroup := jobManager.nodeGroupSet[node.Name]
+		if hasGroup {
+			return fmt.Errorf("plugin %s predicates node %s for task %s/job %s failed due to other group %s",
+				p.Name(), node.Name, task.Name, task.Job, groupSet)
+		} else {
+			return nil
+		}
+	} else {
+		if nGroups, hasGroup := jobManager.taskGroups[taskName]; !hasGroup {
+			if len(jobManager.nodeGroupSet) >= nGroups {
+				//enough nodes for groups
+				klog.V(3).Infof("Current used number of nodes %d/reqired nodes %d",
+					len(jobManager.nodeGroupSet), nGroups)
+				_, ok := jobManager.nodeGroupSet[node.Name]
+				if ok {
+					return nil
+				} else {
+					return fmt.Errorf("plugin %s predicates node %s for task %s/job %s failed due to group restriction",
+						p.Name(), node.Name, task.Name, task.Job)
+				}
 			}
 		}
 	}
@@ -355,7 +374,7 @@ func (p *taskGroupPlugin) OnSessionOpen(ssn *framework.Session) {
 
 	p.initBucket(ssn)
 
-	ssn.AddPredicateFn(p.Name(), p.PredicateFn)
+	// ssn.AddPredicateFn(p.Name(), p.PredicateFn)
 
 	ssn.AddTaskOrderFn(p.Name(), p.TaskOrderFn)
 
