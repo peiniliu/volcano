@@ -18,6 +18,7 @@ package job
 
 import (
 	"fmt"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,6 +32,8 @@ import (
 	"volcano.sh/volcano/pkg/controllers/apis"
 	jobhelpers "volcano.sh/volcano/pkg/controllers/job/helpers"
 )
+
+var detectionPeriodOfDependsOntask time.Duration
 
 // MakePodName append podname,jobname,taskName and index and returns the string.
 func MakePodName(jobName string, taskName string, index int) string {
@@ -97,7 +100,8 @@ func createJobPod(job *batch.Job, template *v1.PodTemplateSpec, topologyPolicy b
 	}
 
 	pod.Annotations[batch.TaskSpecKey] = tsKey
-	pod.Annotations[schedulingv2.KubeGroupNameAnnotationKey] = job.Name
+	pgName := job.Name + "-" + string(job.UID)
+	pod.Annotations[schedulingv2.KubeGroupNameAnnotationKey] = pgName
 	pod.Annotations[batch.JobNameKey] = job.Name
 	pod.Annotations[batch.QueueNameKey] = job.Spec.Queue
 	pod.Annotations[batch.JobVersion] = fmt.Sprintf("%d", job.Status.Version)
@@ -220,32 +224,6 @@ func checkEventExist(policyEvents []v1alpha1.Event, reqEvent v1alpha1.Event) boo
 	return false
 }
 
-func addResourceList(list, req, limit v1.ResourceList) {
-	for name, quantity := range req {
-		if value, ok := list[name]; !ok {
-			list[name] = quantity.DeepCopy()
-		} else {
-			value.Add(quantity)
-			list[name] = value
-		}
-	}
-
-	if req != nil {
-		return
-	}
-
-	// If Requests is omitted for a container,
-	// it defaults to Limits if that is explicitly specified.
-	for name, quantity := range limit {
-		if value, ok := list[name]; !ok {
-			list[name] = quantity.DeepCopy()
-		} else {
-			value.Add(quantity)
-			list[name] = value
-		}
-	}
-}
-
 // TaskPriority structure.
 type TaskPriority struct {
 	priority int32
@@ -273,4 +251,8 @@ func isControlledBy(obj metav1.Object, gvk schema.GroupVersionKind) bool {
 		return true
 	}
 	return false
+}
+
+func SetDetectionPeriodOfDependsOntask(period time.Duration) {
+	detectionPeriodOfDependsOntask = period
 }

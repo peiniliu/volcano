@@ -17,13 +17,16 @@ limitations under the License.
 package api
 
 import (
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog"
+	"k8s.io/kubernetes/pkg/features"
 
 	"volcano.sh/apis/pkg/apis/scheduling/v1beta1"
 )
@@ -117,14 +120,27 @@ func GetPodRevocableZone(pod *v1.Pod) string {
 	return ""
 }
 
-// GetPodTopologyPolicy return volcano.sh/numa-topology-policy value for pod
-func GetPodTopologyPolicy(pod *v1.Pod) string {
+// GetPodTopologyInfo return volcano.sh/numa-topology-policy value for pod
+func GetPodTopologyInfo(pod *v1.Pod) *TopologyInfo {
+	info := TopologyInfo{
+		ResMap: make(map[int]v1.ResourceList),
+	}
+
 	if len(pod.Annotations) > 0 {
 		if value, found := pod.Annotations[v1beta1.NumaPolicyKey]; found {
-			return value
+			info.Policy = value
+		}
+
+		if value, found := pod.Annotations[topologyDecisionAnnotation]; found {
+			decision := PodResourceDecision{}
+			err := json.Unmarshal([]byte(value), &decision)
+			if err == nil {
+				info.ResMap = decision.NUMAResources
+			}
 		}
 	}
-	return ""
+
+	return &info
 }
 
 // GetPodResourceWithoutInitContainers returns Pod's resource request, it does not contain
@@ -133,6 +149,11 @@ func GetPodResourceWithoutInitContainers(pod *v1.Pod) *Resource {
 	result := EmptyResource()
 	for _, container := range pod.Spec.Containers {
 		result.Add(NewResource(container.Resources.Requests))
+	}
+
+	// if PodOverhead feature is supported, add overhead for running a pod
+	if pod.Spec.Overhead != nil && utilfeature.DefaultFeatureGate.Enabled(features.PodOverhead) {
+		result.Add(NewResource(pod.Spec.Overhead))
 	}
 
 	return result

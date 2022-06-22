@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/agiledragon/gomonkey/v2"
-
 	apiv1 "k8s.io/api/core/v1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -189,10 +188,6 @@ func TestEventHandler(t *testing.T) {
 				},
 			},
 		}, nil)
-		ssn.AddUnderusedResourceFn(PluginName, func(info *api.QueueInfo) api.ResourceNameList {
-			// to prevent queue from overusing
-			return api.ResourceNameList{apiv1.ResourceCPU, apiv1.ResourceMemory}
-		})
 		// allocate
 		allocator := allocate.New()
 		allocator.Execute(ssn)

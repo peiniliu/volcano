@@ -28,7 +28,11 @@ import (
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
+	quotav1 "k8s.io/apiserver/pkg/quota/v1"
 	"k8s.io/klog"
+	quotacore "k8s.io/kubernetes/pkg/quota/v1/evaluator/core"
+	"k8s.io/utils/clock"
 
 	batch "volcano.sh/apis/pkg/apis/batch/v1alpha1"
 	"volcano.sh/apis/pkg/apis/helpers"
@@ -146,7 +150,8 @@ func (cc *jobcontroller) killJob(jobInfo *apis.JobInfo, podRetainPhase state.Pha
 	}
 
 	// Delete PodGroup
-	if err := cc.vcClient.SchedulingV1beta1().PodGroups(job.Namespace).Delete(context.TODO(), job.Name, metav1.DeleteOptions{}); err != nil {
+	pgName := job.Name + "-" + string(job.UID)
+	if err := cc.vcClient.SchedulingV1beta1().PodGroups(job.Namespace).Delete(context.TODO(), pgName, metav1.DeleteOptions{}); err != nil {
 		if !apierrors.IsNotFound(err) {
 			klog.Errorf("Failed to delete PodGroup of Job %v/%v: %v",
 				job.Namespace, job.Name, err)
@@ -274,7 +279,8 @@ func (cc *jobcontroller) syncJob(jobInfo *apis.JobInfo, updateStatus state.Updat
 	}
 
 	var syncTask bool
-	if pg, _ := cc.pgLister.PodGroups(job.Namespace).Get(job.Name); pg != nil {
+	pgName := job.Name + "-" + string(job.UID)
+	if pg, _ := cc.pgLister.PodGroups(job.Namespace).Get(pgName); pg != nil {
 		if pg.Status.Phase != "" && pg.Status.Phase != scheduling.PodGroupPending {
 			syncTask = true
 		}
@@ -313,7 +319,7 @@ func (cc *jobcontroller) syncJob(jobInfo *apis.JobInfo, updateStatus state.Updat
 	var running, pending, terminating, succeeded, failed, unknown int32
 	taskStatusCount := make(map[string]batch.TaskState)
 
-	var podToCreate []*v1.Pod
+	podToCreate := make(map[string][]*v1.Pod)
 	var podToDelete []*v1.Pod
 	var creationErrs []error
 	var deletionErrs []error
@@ -325,6 +331,8 @@ func (cc *jobcontroller) syncJob(jobInfo *apis.JobInfo, updateStatus state.Updat
 		*container = append(*container, err)
 	}
 
+	waitCreationGroup := sync.WaitGroup{}
+
 	for _, ts := range job.Spec.Tasks {
 		ts.Template.Name = ts.Name
 		tc := ts.Template.DeepCopy()
@@ -335,6 +343,7 @@ func (cc *jobcontroller) syncJob(jobInfo *apis.JobInfo, updateStatus state.Updat
 			pods = map[string]*v1.Pod{}
 		}
 
+		var podToCreateEachTask []*v1.Pod
 		for i := 0; i < int(ts.Replicas); i++ {
 			podName := fmt.Sprintf(jobhelpers.PodNameFmt, job.Name, name, i)
 			if pod, found := pods[podName]; !found {
@@ -342,7 +351,8 @@ func (cc *jobcontroller) syncJob(jobInfo *apis.JobInfo, updateStatus state.Updat
 				if err := cc.pluginOnPodCreate(job, newPod); err != nil {
 					return err
 				}
-				podToCreate = append(podToCreate, newPod)
+				podToCreateEachTask = append(podToCreateEachTask, newPod)
+				waitCreationGroup.Add(1)
 			} else {
 				delete(pods, podName)
 				if pod.DeletionTimestamp != nil {
@@ -355,33 +365,44 @@ func (cc *jobcontroller) syncJob(jobInfo *apis.JobInfo, updateStatus state.Updat
 				calcPodStatus(pod, taskStatusCount)
 			}
 		}
-
+		podToCreate[ts.Name] = podToCreateEachTask
 		for _, pod := range pods {
 			podToDelete = append(podToDelete, pod)
 		}
 	}
 
-	waitCreationGroup := sync.WaitGroup{}
-	waitCreationGroup.Add(len(podToCreate))
-	for _, pod := range podToCreate {
-		go func(pod *v1.Pod) {
-			defer waitCreationGroup.Done()
-			newPod, err := cc.kubeClient.CoreV1().Pods(pod.Namespace).Create(context.TODO(), pod, metav1.CreateOptions{})
-			if err != nil && !apierrors.IsAlreadyExists(err) {
-				// Failed to create Pod, waitCreationGroup a moment and then create it again
-				// This is to ensure all podsMap under the same Job created
-				// So gang-scheduling could schedule the Job successfully
-				klog.Errorf("Failed to create pod %s for Job %s, err %#v",
-					pod.Name, job.Name, err)
-				appendError(&creationErrs, fmt.Errorf("failed to create pod %s, err: %#v", pod.Name, err))
-			} else {
-				classifyAndAddUpPodBaseOnPhase(newPod, &pending, &running, &succeeded, &failed, &unknown)
-				calcPodStatus(pod, taskStatusCount)
-				klog.V(3).Infof("Created Task <%s> of Job <%s/%s>",
-					pod.Name, job.Namespace, job.Name)
+	for taskName, podToCreateEachTask := range podToCreate {
+		if len(podToCreateEachTask) == 0 {
+			continue
+		}
+		go func(taskName string, podToCreateEachTask []*v1.Pod) {
+			taskIndex := jobhelpers.GetTasklndexUnderJob(taskName, job)
+			if job.Spec.Tasks[taskIndex].DependsOn != nil {
+				cc.waitDependsOnTaskMeetCondition(taskName, taskIndex, podToCreateEachTask, job)
 			}
-		}(pod)
+
+			for _, pod := range podToCreateEachTask {
+				go func(pod *v1.Pod) {
+					defer waitCreationGroup.Done()
+					newPod, err := cc.kubeClient.CoreV1().Pods(pod.Namespace).Create(context.TODO(), pod, metav1.CreateOptions{})
+					if err != nil && !apierrors.IsAlreadyExists(err) {
+						// Failed to create Pod, waitCreationGroup a moment and then create it again
+						// This is to ensure all podsMap under the same Job created
+						// So gang-scheduling could schedule the Job successfully
+						klog.Errorf("Failed to create pod %s for Job %s, err %#v",
+							pod.Name, job.Name, err)
+						appendError(&creationErrs, fmt.Errorf("failed to create pod %s, err: %#v", pod.Name, err))
+					} else {
+						classifyAndAddUpPodBaseOnPhase(newPod, &pending, &running, &succeeded, &failed, &unknown)
+						calcPodStatus(pod, taskStatusCount)
+						klog.V(5).Infof("Created Task <%s> of Job <%s/%s>",
+							pod.Name, job.Namespace, job.Name)
+					}
+				}(pod)
+			}
+		}(taskName, podToCreateEachTask)
 	}
+
 	waitCreationGroup.Wait()
 
 	if len(creationErrs) != 0 {
@@ -456,6 +477,68 @@ func (cc *jobcontroller) syncJob(jobInfo *apis.JobInfo, updateStatus state.Updat
 	}
 
 	return nil
+}
+
+func (cc *jobcontroller) waitDependsOnTaskMeetCondition(taskName string, taskIndex int, podToCreateEachTask []*v1.Pod, job *batch.Job) {
+	if job.Spec.Tasks[taskIndex].DependsOn != nil {
+		dependsOn := *job.Spec.Tasks[taskIndex].DependsOn
+		if len(dependsOn.Name) > 1 && dependsOn.Iteration == batch.IterationAny {
+			wait.PollInfinite(detectionPeriodOfDependsOntask, func() (bool, error) {
+				for _, task := range dependsOn.Name {
+					if cc.isDependsOnPodsReady(task, job) {
+						return true, nil
+					}
+				}
+				return false, nil
+			})
+		} else {
+			for _, dependsOnTask := range dependsOn.Name {
+				wait.PollInfinite(detectionPeriodOfDependsOntask, func() (bool, error) {
+					if cc.isDependsOnPodsReady(dependsOnTask, job) {
+						return true, nil
+					}
+					return false, nil
+				})
+			}
+		}
+	}
+}
+
+func (cc *jobcontroller) isDependsOnPodsReady(task string, job *batch.Job) bool {
+	dependsOnPods := jobhelpers.GetPodsNameUnderTask(task, job)
+	dependsOnTaskIndex := jobhelpers.GetTasklndexUnderJob(task, job)
+	runningPodCount := 0
+	for _, podName := range dependsOnPods {
+		pod, err := cc.podLister.Pods(job.Namespace).Get(podName)
+		if err != nil {
+			klog.Errorf("Failed to get pod %v/%v %v", job.Namespace, podName, err)
+			continue
+		}
+
+		if pod.Status.Phase != v1.PodRunning && pod.Status.Phase != v1.PodSucceeded {
+			klog.V(5).Infof("Sequential state, pod %v/%v of depends on tasks is not running", pod.Namespace, pod.Name)
+			continue
+		}
+
+		allContainerReady := true
+		for _, containerStatus := range pod.Status.ContainerStatuses {
+			if !containerStatus.Ready {
+				allContainerReady = false
+				break
+			}
+		}
+		if allContainerReady {
+			runningPodCount++
+		}
+	}
+	dependsOnTaskMinReplicas := job.Spec.Tasks[dependsOnTaskIndex].MinAvailable
+	if dependsOnTaskMinReplicas != nil {
+		if runningPodCount < int(*dependsOnTaskMinReplicas) {
+			klog.V(5).Infof("In a depends on startup state, there are already %d pods running, which is less than the minimum number of runs", runningPodCount)
+			return false
+		}
+	}
+	return true
 }
 
 func (cc *jobcontroller) createJobIOIfNotExist(job *batch.Job) (*batch.Job, error) {
@@ -548,7 +631,8 @@ func (cc *jobcontroller) createPVC(job *batch.Job, vcName string, volumeClaim *v
 
 func (cc *jobcontroller) createOrUpdatePodGroup(job *batch.Job) error {
 	// If PodGroup does not exist, create one for Job.
-	pg, err := cc.pgLister.PodGroups(job.Namespace).Get(job.Name)
+	pgName := job.Name + "-" + string(job.UID)
+	pg, err := cc.pgLister.PodGroups(job.Namespace).Get(pgName)
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
 			klog.Errorf("Failed to get PodGroup for Job <%s/%s>: %v",
@@ -567,8 +651,9 @@ func (cc *jobcontroller) createOrUpdatePodGroup(job *batch.Job) error {
 
 		pg := &scheduling.PodGroup{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:   job.Namespace,
-				Name:        job.Name,
+				Namespace: job.Namespace,
+				//add job.UID into its name when create new PodGroup
+				Name:        pgName,
 				Annotations: job.Annotations,
 				Labels:      job.Labels,
 				OwnerReferences: []metav1.OwnerReference{
@@ -661,33 +746,37 @@ func (cc *jobcontroller) calcPGMinResources(job *batch.Job) *v1.ResourceList {
 		tp := TaskPriority{0, task}
 		pc := task.Template.Spec.PriorityClassName
 
-		priorityClass, err := cc.pcLister.Get(pc)
-		if err != nil || priorityClass == nil {
-			klog.Warningf("Ignore task %s priority class %s: %v", task.Name, pc, err)
-		} else {
-			tp.priority = priorityClass.Value
+		if pc != "" {
+			priorityClass, err := cc.pcLister.Get(pc)
+			if err != nil || priorityClass == nil {
+				klog.Warningf("Ignore task %s priority class %s: %v", task.Name, pc, err)
+			} else {
+				tp.priority = priorityClass.Value
+			}
 		}
-
 		tasksPriority = append(tasksPriority, tp)
 	}
 
 	sort.Sort(tasksPriority)
 
-	minAvailableTasksRes := v1.ResourceList{}
+	minReq := v1.ResourceList{}
 	podCnt := int32(0)
 	for _, task := range tasksPriority {
 		for i := int32(0); i < task.Replicas; i++ {
 			if podCnt >= job.Spec.MinAvailable {
 				break
 			}
+
 			podCnt++
-			for _, c := range task.Template.Spec.Containers {
-				addResourceList(minAvailableTasksRes, c.Resources.Requests, c.Resources.Limits)
+			pod := &v1.Pod{
+				Spec: task.Template.Spec,
 			}
+			res, _ := quotacore.PodUsageFunc(pod, clock.RealClock{})
+			minReq = quotav1.Add(minReq, res)
 		}
 	}
 
-	return &minAvailableTasksRes
+	return &minReq
 }
 
 func (cc *jobcontroller) initJobStatus(job *batch.Job) (*batch.Job, error) {

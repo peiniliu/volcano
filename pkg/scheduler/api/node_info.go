@@ -19,6 +19,7 @@ package api
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog"
@@ -52,8 +53,9 @@ type NodeInfo struct {
 	// pods
 	Used *Resource
 
-	Allocatable *Resource
-	Capability  *Resource
+	Allocatable   *Resource
+	Capability    *Resource
+	ResourceUsage *NodeUsage
 
 	Tasks             map[TaskID]*TaskInfo
 	NumaInfo          *NumatopoInfo
@@ -92,6 +94,26 @@ type NodeState struct {
 	Reason string
 }
 
+// NodeUsage defines the real load usage of node
+type NodeUsage struct {
+	CPUUsageAvg map[string]float64
+	MEMUsageAvg map[string]float64
+}
+
+func (nu *NodeUsage) DeepCopy() *NodeUsage {
+	newUsage := &NodeUsage{
+		CPUUsageAvg: make(map[string]float64),
+		MEMUsageAvg: make(map[string]float64),
+	}
+	for k, v := range nu.CPUUsageAvg {
+		newUsage.CPUUsageAvg[k] = v
+	}
+	for k, v := range nu.MEMUsageAvg {
+		newUsage.MEMUsageAvg[k] = v
+	}
+	return newUsage
+}
+
 // NewNodeInfo is used to create new nodeInfo object
 func NewNodeInfo(node *v1.Node) *NodeInfo {
 	nodeInfo := &NodeInfo{
@@ -100,8 +122,9 @@ func NewNodeInfo(node *v1.Node) *NodeInfo {
 		Idle:      EmptyResource(),
 		Used:      EmptyResource(),
 
-		Allocatable: EmptyResource(),
-		Capability:  EmptyResource(),
+		Allocatable:   EmptyResource(),
+		Capability:    EmptyResource(),
+		ResourceUsage: &NodeUsage{},
 
 		OversubscriptionResource: EmptyResource(),
 		Tasks:                    make(map[TaskID]*TaskInfo),
@@ -156,6 +179,12 @@ func (ni *NodeInfo) Clone() *NodeInfo {
 
 	for _, p := range ni.Tasks {
 		res.AddTask(p)
+	}
+	if ni.NumaInfo != nil {
+		res.NumaInfo = ni.NumaInfo.DeepCopy()
+	}
+	if ni.ResourceUsage != nil {
+		res.ResourceUsage = ni.ResourceUsage.DeepCopy()
 	}
 
 	if ni.NumaSchedulerInfo != nil {
@@ -295,8 +324,14 @@ func (ni *NodeInfo) setNodeGPUInfo(node *v1.Node) {
 	}
 
 	memoryPerCard := uint(totalMemory / gpuNumber)
+	ni.GPUDevices = make(map[int]*GPUDevice)
 	for i := 0; i < int(gpuNumber); i++ {
 		ni.GPUDevices[i] = NewGPUDevice(i, memoryPerCard)
+	}
+	unhealthyGPUs := ni.getUnhealthyGPUs(node)
+	for i := range unhealthyGPUs {
+		klog.V(4).Infof("delete unhealthy gpu id %d from GPUDevices", unhealthyGPUs[i])
+		delete(ni.GPUDevices, unhealthyGPUs[i])
 	}
 }
 
@@ -408,6 +443,10 @@ func (ni *NodeInfo) AddTask(task *TaskInfo) error {
 		}
 	}
 
+	if ni.NumaInfo != nil {
+		ni.NumaInfo.AddTask(ti)
+	}
+
 	// Update task node name upon successful task addition.
 	task.NodeName = ni.Name
 	ti.NodeName = ni.Name
@@ -443,6 +482,10 @@ func (ni *NodeInfo) RemoveTask(ti *TaskInfo) error {
 			ni.Used.Sub(task.Resreq)
 			ni.SubGPUResource(ti.Pod)
 		}
+	}
+
+	if ni.NumaInfo != nil {
+		ni.NumaInfo.RemoveTask(ti)
 	}
 
 	delete(ni.Tasks, key)
@@ -557,4 +600,25 @@ func (ni *NodeInfo) SubGPUResource(pod *v1.Pod) {
 			}
 		}
 	}
+}
+
+// getUnhealthyGPUs returns all the unhealthy GPU id.
+func (ni *NodeInfo) getUnhealthyGPUs(node *v1.Node) (unhealthyGPUs []int) {
+	unhealthyGPUs = []int{}
+	devicesStr, ok := node.Annotations[UnhealthyGPUIDs]
+
+	if !ok {
+		return
+	}
+
+	idsStr := strings.Split(devicesStr, ",")
+	for _, sid := range idsStr {
+		id, err := strconv.Atoi(sid)
+		if err != nil {
+			klog.Warningf("Failed to parse unhealthy gpu id %s due to %v", sid, err)
+		} else {
+			unhealthyGPUs = append(unhealthyGPUs, id)
+		}
+	}
+	return
 }
