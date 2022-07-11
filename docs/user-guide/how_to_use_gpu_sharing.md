@@ -46,6 +46,8 @@ Same as above, after installed, update the scheduler configuration in `volcano-s
 
 Please refer to [volcano device plugin](https://github.com/volcano-sh/devices/blob/master/README.md#quick-start)
 
+* Remember to enable volcano device plugin to support shared GPUs, users need to config volcano device plugin --gpu-strategy=share. For more information [volcano device plugin configuration](https://github.com/peiniliu/devices/blob/dev/doc/config.md)
+
 ### Verify environment is ready
 
 Check the node status, it is ok if `volcano.sh/gpu-memory` and `volcano.sh/gpu-number` are included in the allocatable resources.

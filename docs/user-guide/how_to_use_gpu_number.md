@@ -47,37 +47,35 @@ Same as above, after installed, update the scheduler configuration in `volcano-s
 
 Please refer to [volcano device plugin](https://github.com/volcano-sh/devices/blob/master/README.md#quick-start)
 
+* By default volcano device plugin to support asking individual GPUs, users do not need to config volcano device plugin. Default setting is the same as setting --gpu-strategy=number. For more information [volcano device plugin configuration](https://github.com/peiniliu/devices/blob/dev/doc/config.md)
+
 ### Verify environment is ready
 
-Check the node status, it is ok if `volcano.sh/gpu-memory` and `volcano.sh/gpu-number` are included in the allocatable resources. 
+Check the node status, it is ok  `volcano.sh/gpu-number` is included in the allocatable resources. 
 
 ```shell script
 $ kubectl get node {node name} -oyaml
 ...
-status:
-  addresses:
-  - address: 172.17.0.3
-    type: InternalIP
-  - address: volcano-control-plane
-    type: Hostname
-  allocatable:
-    cpu: "4"
-    ephemeral-storage: 123722704Ki
-    hugepages-1Gi: "0"
-    hugepages-2Mi: "0"
-    memory: 8174332Ki
-    pods: "110"
-    volcano.sh/gpu-memory: "89424"
-    volcano.sh/gpu-number: "8"    # GPU resource
-  capacity:
-    cpu: "4"
-    ephemeral-storage: 123722704Ki
-    hugepages-1Gi: "0"
-    hugepages-2Mi: "0"
-    memory: 8174332Ki
-    pods: "110"
-    volcano.sh/gpu-memory: "89424"
-    volcano.sh/gpu-number: "8"   # GPU resource
+Capacity:
+  attachable-volumes-gce-pd:  127
+  cpu:                        2
+  ephemeral-storage:          98868448Ki
+  hugepages-1Gi:              0
+  hugepages-2Mi:              0
+  memory:                     7632596Ki
+  pods:                       110
+  volcano.sh/gpu-memory:      0
+  volcano.sh/gpu-number:      1
+Allocatable:
+  attachable-volumes-gce-pd:  127
+  cpu:                        1930m
+  ephemeral-storage:          47093746742
+  hugepages-1Gi:              0
+  hugepages-2Mi:              0
+  memory:                     5752532Ki
+  pods:                       110
+  volcano.sh/gpu-memory:      0
+  volcano.sh/gpu-number:      1
 ```
 
 ### Running Jobs With Multiple GPU Cards
@@ -97,23 +95,7 @@ spec:
       args: ["100000"]
       resources:
         limits:
-          volcano.sh/gpu-number: 2 # requesting 2 gpu cards
-EOF
-
-$ cat <<EOF | kubectl apply -f -
-apiVersion: v1
-kind: Pod
-metadata:
-  name: gpu-pod2
-spec:
-  containers:
-    - name: cuda-container
-      image: nvidia/cuda:9.0-devel
-      command: ["sleep"]
-      args: ["100000"]
-      resources:
-        limits:
-          volcano.sh/gpu-number: 2 # requesting 2 gpu cards
+          volcano.sh/gpu-number: 1 # requesting 2 gpu cards
 EOF
 ```
 
@@ -122,16 +104,9 @@ If the above pods claim multiple gpu cards, you can see each of them has exclusi
 ```shell script
 $ kubectl exec -ti  gpu-pod1 env
 ...
-VOLCANO_GPU_TOTAL=11178
-VOLCANO_GPU_ALLOCATED=1024
-NVIDIA_VISIBLE_DEVICES=0,1
-...
-
-$ kubectl exec -ti  gpu-pod1 env
-...
-VOLCANO_GPU_TOTAL=11178
-VOLCANO_GPU_ALLOCATED=1024
-NVIDIA_VISIBLE_DEVICES=2,3
+NVIDIA_VISIBLE_DEVICES=0
+VOLCANO_GPU_TOTAL=15109
+VOLCANO_GPU_ALLOCATED=1
 ...
 ```
 ### Understanding How Multiple GPU Cards Requirement Works 
@@ -146,7 +121,7 @@ The main architecture is similar as the previous, but the gpu-index results of e
 
 ```yaml
 annotations:
-  volcano.sh/gpu-index: “0,1”
+  volcano.sh/gpu-index: “0”
   volcano.sh/predicate-time: “1593764466550835304”
 ```
 
@@ -154,7 +129,7 @@ annotations:
 
 ```yaml
 env:
-  NVIDIA_VISIBLE_DEVICES: “0,1” # GPU card index
-  VOLCANO_GPU_ALLOCATED: “1024” # GPU allocated
-  VOLCANO_GPU_TOTAL: “11178” # GPU memory of the card
+  NVIDIA_VISIBLE_DEVICES: “0” # GPU card index
+  VOLCANO_GPU_ALLOCATED: “1” # GPU number allocated
+  VOLCANO_GPU_TOTAL: “15109” # GPU memory of the card
 ```
