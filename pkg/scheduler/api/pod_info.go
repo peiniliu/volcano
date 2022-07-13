@@ -166,6 +166,9 @@ func GetGPUIndex(pod *v1.Pod) []int {
 		value, found := pod.Annotations[GPUIndex]
 		if found {
 			ids := strings.Split(value, ",")
+			if len(ids) == 0 {
+				klog.Errorf("invalid gpu index annotation %s=%s", GPUIndex, value)
+			}
 			idSlice := make([]int, len(ids))
 			for idx, id := range ids {
 				j, err := strconv.Atoi(id)
