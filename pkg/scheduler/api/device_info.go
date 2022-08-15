@@ -60,17 +60,29 @@ func (g *GPUDevice) isIdleGPU() bool {
 
 // GetGPUMemoryOfPod returns the GPU memory required by the pod.
 func GetGPUMemoryOfPod(pod *v1.Pod) uint {
+	var initMem uint
+	for _, container := range pod.Spec.InitContainers {
+		res := getGPUMemoryOfContainer(container.Resources)
+		if initMem < res {
+			initMem = res
+		}
+	}
+
 	var mem uint
 	for _, container := range pod.Spec.Containers {
-		mem += GetGPUMemoryOfContainer(&container)
+		mem += getGPUMemoryOfContainer(container.Resources)
 	}
-	return mem
+
+	if mem > initMem {
+		return mem
+	}
+	return initMem
 }
 
-// GetGPUMemoryOfPod returns the GPU memory required by the container.
-func GetGPUMemoryOfContainer(container *v1.Container) uint {
+// getGPUMemoryOfContainer returns the GPU memory required by the container.
+func getGPUMemoryOfContainer(resources v1.ResourceRequirements) uint {
 	var mem uint
-	if val, ok := container.Resources.Limits[VolcanoGPUResource]; ok {
+	if val, ok := resources.Limits[VolcanoGPUResource]; ok {
 		mem = uint(val.Value())
 	}
 	return mem
