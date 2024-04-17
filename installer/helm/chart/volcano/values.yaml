@@ -4,7 +4,7 @@ basic:
   admission_image_name: "volcanosh/vc-webhook-manager"
   admission_secret_name: "volcano-admission-secret"
   admission_config_file: "config/volcano-admission.conf"
-  scheduler_config_file: "config/volcano-scheduler.conf"
+  scheduler_config_file: "config/volcano-scheduler-usage.conf"
   image_pull_secret: ""
   image_pull_policy: "Always"
   image_tag_version: "latest"
