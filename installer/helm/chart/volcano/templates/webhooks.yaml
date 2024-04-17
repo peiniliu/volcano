@@ -40,7 +40,7 @@ webhooks:
           - pods
         scope: '*'
     sideEffects: NoneOnDryRun
-    timeoutSeconds: 10
+    timeoutSeconds: 30
 {{- end }}
 
 {{- if .Values.custom.enabled_admissions | regexMatch "/queues/mutate" }}
@@ -84,7 +84,7 @@ webhooks:
           - queues
         scope: '*'
     sideEffects: NoneOnDryRun
-    timeoutSeconds: 10
+    timeoutSeconds: 30
 {{- end }}
 
 
@@ -129,7 +129,7 @@ webhooks:
           - podgroups
         scope: '*'
     sideEffects: NoneOnDryRun
-    timeoutSeconds: 10
+    timeoutSeconds: 30
 {{- end }}
 
 
@@ -174,7 +174,7 @@ webhooks:
           - jobs
         scope: '*'
     sideEffects: NoneOnDryRun
-    timeoutSeconds: 10
+    timeoutSeconds: 30
 {{- end }}
 
 
@@ -219,7 +219,7 @@ webhooks:
           - jobs
         scope: '*'
     sideEffects: NoneOnDryRun
-    timeoutSeconds: 10
+    timeoutSeconds: 30
 {{- end }}
 
 
@@ -263,7 +263,7 @@ webhooks:
           - pods
         scope: '*'
     sideEffects: NoneOnDryRun
-    timeoutSeconds: 10
+    timeoutSeconds: 30
 {{- end }}
 
 
@@ -309,6 +309,6 @@ webhooks:
           - queues
         scope: '*'
     sideEffects: NoneOnDryRun
-    timeoutSeconds: 10
+    timeoutSeconds: 30
 {{- end }}
 {{- end }}
