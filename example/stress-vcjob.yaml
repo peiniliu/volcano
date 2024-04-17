@@ -1,0 +1,42 @@
+apiVersion: batch.volcano.sh/v1alpha1
+kind: Job
+metadata:
+  name: cpu-memory-stress-job
+spec:
+  minAvailable: 1 # Minimum number of pods to run
+  schedulerName: volcano # Use Volcano as the scheduler
+  policies:
+    - event: PodEvicted
+      action: RestartJob
+  tasks:
+    - replicas: 1
+      name: stress-task
+      policies:
+        - event: TaskCompleted
+          action: CompleteJob
+      template:
+        metadata:
+          labels:
+            app: stress
+        spec:
+          containers:
+          - name: stress
+            image: polinux/stress
+            resources:
+              limits:
+                cpu: "2"
+                memory: "256Mi"
+              requests:
+                cpu: "0.5"
+                memory: "128Mi"
+            args:
+            - "stress"
+            - "--cpu"
+            - "2"  # Number of CPUs to stress
+            - "--io"
+            - "1"  # Number of I/O operations to stress
+            - "--vm"
+            - "1"  # Number of memory allocations to stress
+            - "--vm-bytes"
+            - "128M"  # Amount of memory per allocation
+
