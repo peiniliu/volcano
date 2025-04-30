@@ -1465,10 +1465,12 @@ func (sc *SchedulerCache) setMetricsData(usageInfo map[string]*source.NodeMetric
 		nodeUsage := &schedulingapi.NodeUsage{
 			CPUUsageAvg: make(map[string]float64),
 			MEMUsageAvg: make(map[string]float64),
+			PowerUsageAvg: make(map[string]float64),
 		}
 		nodeUsage.MetricsTime = nodeMetric.MetricsTime
 		nodeUsage.CPUUsageAvg[source.NODE_METRICS_PERIOD] = nodeMetric.CPU
 		nodeUsage.MEMUsageAvg[source.NODE_METRICS_PERIOD] = nodeMetric.Memory
+		nodeUsage.PowerUsageAvg[source.NODE_METRICS_PERIOD] = nodeMetric.Power
 
 		nodeInfo, ok := sc.Nodes[nodeName]
 		if !ok {

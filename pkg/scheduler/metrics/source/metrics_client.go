@@ -36,6 +36,7 @@ type NodeMetrics struct {
 	MetricsTime time.Time
 	CPU         float64
 	Memory      float64
+	Power       float64
 }
 
 type MetricsClient interface {

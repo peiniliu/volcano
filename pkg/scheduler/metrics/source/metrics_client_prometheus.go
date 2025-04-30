@@ -75,10 +75,11 @@ func (p *PrometheusMetricsClient) NodeMetricsAvg(ctx context.Context, nodeName s
 	}
 	v1api := prometheusv1.NewAPI(client)
 	nodeMetrics := &NodeMetrics{}
-	cpuQueryStr := fmt.Sprintf("avg_over_time((100 - (avg by (instance) (irate(node_cpu_seconds_total{mode=\"idle\",instance=\"%s\"}[5m])) * 100))[%s:30s])", nodeName, NODE_METRICS_PERIOD)
+	cpuQueryStr := fmt.Sprintf("avg_over_time((100 - (avg by (instance) (irate(node_cpu_seconds_total{mode=\"idle\",instance=\"%s\"}[1m])) * 100))[%s:30s])", nodeName, NODE_METRICS_PERIOD)
 	memQueryStr := fmt.Sprintf("100*avg_over_time(((1-node_memory_MemAvailable_bytes{instance=\"%s\"}/node_memory_MemTotal_bytes{instance=\"%s\"}))[%s:30s])", nodeName, nodeName, NODE_METRICS_PERIOD)
+	powerQueryStr := fmt.Sprintf("avg_over_time(irate(kepler_container_package_joules_total{instance="%s"}[1m]+kepler_container_dram_joules_total{instance="%s"}[1m]+kepler_container_other_joules_total{instance="%s"}[1m])[%s:30s])", nodeName, nodeName, nodeName, NODE_METRICS_PERIOD)
 
-	for _, metric := range []string{cpuQueryStr, memQueryStr} {
+	for _, metric := range []string{cpuQueryStr, memQueryStr, powerQueryStr} {
 		res, warnings, err := v1api.Query(ctx, metric, time.Now())
 		if err != nil {
 			klog.Errorf("Error querying Prometheus: %v", err)
@@ -105,6 +106,9 @@ func (p *PrometheusMetricsClient) NodeMetricsAvg(ctx context.Context, nodeName s
 		case memQueryStr:
 			memUsage, _ := strconv.ParseFloat(value[0], 64)
 			nodeMetrics.Memory = memUsage
+		case powerQueryStr:
+			powerUsage, _ := strconv.ParseFloat(value[0], 64)
+			nodeMetrics.Power = powerUsage
 		}
 	}
 	nodeMetrics.MetricsTime = time.Now()

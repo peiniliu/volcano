@@ -113,12 +113,14 @@ type NodeUsage struct {
 	MetricsTime time.Time
 	CPUUsageAvg map[string]float64
 	MEMUsageAvg map[string]float64
+	PowerUsageAvg map[string]float64
 }
 
 func (nu *NodeUsage) DeepCopy() *NodeUsage {
 	newUsage := &NodeUsage{
 		CPUUsageAvg: make(map[string]float64),
 		MEMUsageAvg: make(map[string]float64),
+		PowerUsageAvg: make(map[string]float64),
 	}
 	newUsage.MetricsTime = nu.MetricsTime
 	for k, v := range nu.CPUUsageAvg {
@@ -126,6 +128,9 @@ func (nu *NodeUsage) DeepCopy() *NodeUsage {
 	}
 	for k, v := range nu.MEMUsageAvg {
 		newUsage.MEMUsageAvg[k] = v
+	}
+	for k, v := range nu.PowerUsageAvg {
+		newUsage.PowerUsageAvg[k] = v
 	}
 	return newUsage
 }
